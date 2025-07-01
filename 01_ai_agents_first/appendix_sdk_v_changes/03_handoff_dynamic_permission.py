@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv, find_dotenv
 from openai import AsyncOpenAI
 from pydantic import BaseModel
-from agents import Agent, OpenAIChatCompletionsModel, Runner, set_tracing_disabled, handoff
+from agents import Agent, OpenAIChatCompletionsModel, RunContextWrapper, Runner, set_tracing_disabled, handoff
 from agents.run import AgentRunner, set_default_agent_runner
 
 _ = load_dotenv(find_dotenv())
@@ -40,6 +40,14 @@ class UserContext(BaseModel):
     has_permission: bool = False
 
 
+def dynamic_handoff(ctx : RunContextWrapper):
+    print(f"dynamic_handoff()")
+    if ctx.context.has_permission:
+        return expert_agent
+    else:
+        raise Exception("You do not have permission to call the expert agent")
+
+
 # This agent will use the custom LLM provider
 agent = Agent(
     name="Assistant",
@@ -54,7 +62,7 @@ expert_agent = Agent(
 )
 
 
-agent.handoffs = [handoff(expert_agent, is_enabled=lambda ctx, agent: ctx.context.has_permission)]
+agent.handoffs = [handoff(expert_agent, on_handoff=dynamic_handoff)]
 
 async def main():
     context = UserContext(user_id="123", subscription_tier="premium", has_permission=False)
